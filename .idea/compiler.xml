@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="sa-user" />
+        <module name="sa-model" />
+        <module name="sa-auth" />
+        <module name="sa-common" />
+      </profile>
+    </annotationProcessing>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="sa-auth" options="-parameters" />
+      <module name="sa-common" options="-parameters" />
+      <module name="sa-model" options="-parameters" />
+      <module name="sa-user" options="-parameters" />
+    </option>
+  </component>
+</project>
