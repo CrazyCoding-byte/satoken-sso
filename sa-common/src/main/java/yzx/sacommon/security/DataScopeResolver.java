@@ -95,7 +95,7 @@ public class DataScopeResolver {
             return List.of();
         }
         return deptMapper.selectList(new LambdaQueryWrapper<SysDept>()
-                        .and(w -> w.eq(SysDept::getId, deptId).or().apply("FIND_IN_SET({0},`ancetors`)", deptId)))
+                        .and(w -> w.eq(SysDept::getId, deptId).or().apply("FIND_IN_SET({0},ancestors)", deptId)))
                 .stream()
                 .map(SysDept::getId)
                 .toList();

@@ -27,6 +27,9 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.status(401).body(Result.error(null));
     }
-
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Result<Void>> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.status(400).body(Result.error(null));
+    }
 
 }
