@@ -2,6 +2,7 @@ package yzx.sacommon.security;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpUtil;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +23,7 @@ import java.util.List;
  *
  *
  */
+@Component
 public class SaPermissionProvider implements StpInterface {
     /** 与登录时写入会话的 key 必须完全一致 */
     public static final String PERMISSIONS_KEY = "PERMISSIONS";
@@ -29,12 +31,12 @@ public class SaPermissionProvider implements StpInterface {
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
-        return List.of();
+        return read(loginId, PERMISSIONS_KEY);
     }
 
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
-        return List.of();
+        return read(loginId,ROLES_KEY);
     }
 
     private List<String> read(Object loginId, String key) {

@@ -9,11 +9,18 @@ import yzx.saauth.dto.LoginRequest;
 import yzx.saauth.dto.LoginResponse;
 import yzx.saauth.service.AuthService;
 import yzx.sacommon.domain.dto.CurrentUser;
+import yzx.sacommon.domain.dto.PermissionSnapshot;
 import yzx.sacommon.domain.entity.SysTenant;
 import yzx.sacommon.domain.entity.SysUser;
 import yzx.sacommon.mapper.SysTenantMapper;
 import yzx.sacommon.mapper.SysUserMapper;
 import yzx.sacommon.security.DataScopeResolver;
+import yzx.sacommon.security.PermissionResolver;
+import yzx.sacommon.security.SaPermissionProvider;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * @className: AuthServiceImpl
  * @author: yzx
@@ -28,12 +35,14 @@ public class AuthServiceImpl implements AuthService {
     private final SysTenantMapper tenantMapper;
     private final DataScopeResolver dataScopeResolver;
     private final ObjectMapper objectMapper;
+    private final PermissionResolver permissionResolver;
 
-    public AuthServiceImpl(SysUserMapper sysUserMapper, SysTenantMapper tenantMapper, DataScopeResolver dataScopeResolver, ObjectMapper objectMapper) {
+    public AuthServiceImpl(SysUserMapper sysUserMapper, SysTenantMapper tenantMapper, DataScopeResolver dataScopeResolver, ObjectMapper objectMapper, PermissionResolver permissionResolver) {
         this.sysUserMapper = sysUserMapper;
         this.tenantMapper = tenantMapper;
         this.dataScopeResolver = dataScopeResolver;
         this.objectMapper = objectMapper;
+        this.permissionResolver = permissionResolver;
     }
 
     @Override
@@ -62,7 +71,21 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new IllegalStateException("登录会话写入失败", e);
         }
-        SaTokenInfo tokenInfo = StpUtil.getTokenInfo();
+        //功能快照
+        PermissionSnapshot snapshot = permissionResolver.resolve(sysUser.getId());
+        List<String> permissions=new ArrayList<>(snapshot.permissions());
+        List<String> roles=new ArrayList<>(snapshot.roles());
+        //平台超管不参与角色体系
+        if("00".equals(sysUser.getUsername())){
+            permissions.add("*");
+            roles.add("super-admin");
+        }
+        //satoken设置permission
+        StpUtil.getSession().set(SaPermissionProvider.PERMISSIONS_KEY, permissions);
+        StpUtil.getSession().set(SaPermissionProvider.ROLES_KEY, roles);
+
+        //返回token
+        SaTokenInfo tokenInfo  = StpUtil.getTokenInfo();
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setTokenName(tokenInfo.getTokenName());
         loginResponse.setTokenValue(tokenInfo.getTokenValue());
