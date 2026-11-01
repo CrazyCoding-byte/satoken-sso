@@ -1,6 +1,7 @@
 package yzx.sacommon.filter;
 
 import cn.dev33.satoken.SaManager;
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -36,9 +37,17 @@ public class SaUserFilter extends OncePerRequestFilter {
             String tokenName = SaManager.getConfig().getTokenName();
             String tokenValue = request.getHeader(tokenName);
             if (tokenValue != null && !tokenValue.isEmpty() && !tokenValue.isBlank()) {
-                Object loginIdByToken = StpUtil.getLoginIdByToken(tokenValue);
-
+                Object loginId = StpUtil.getLoginIdByToken(tokenValue);
+                if (loginId != null) {
+                    SaSession saSession = StpUtil.getSessionByLoginId(loginId);
+                    Object json = saSession.get(SESSION_KEY);
+                    if (json != null) {
+                        CurrentUser currentUser = objectMapper.readValue(json.toString(), CurrentUser.class);
+                        CurrentUserHolder.set(currentUser);
+                    }
+                }
             }
+            filterChain.doFilter(request, response);
         } finally {
             CurrentUserHolder.clear();
         }

@@ -76,7 +76,7 @@ public class AuthServiceImpl implements AuthService {
         List<String> permissions=new ArrayList<>(snapshot.permissions());
         List<String> roles=new ArrayList<>(snapshot.roles());
         //平台超管不参与角色体系
-        if("00".equals(sysUser.getUsername())){
+        if("00".equals(sysUser.getUserType())){
             permissions.add("*");
             roles.add("super-admin");
         }
@@ -92,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
         loginResponse.setUserId(sysUser.getId());
         loginResponse.setNickname(sysUser.getNickname());
         loginResponse.setTenantId(tenant.getId());
-        loginResponse.setDeptId(sysUser.getDeptId());
+        loginResponse.setUserType(sysUser.getUserType());
         return loginResponse;
     }
 
