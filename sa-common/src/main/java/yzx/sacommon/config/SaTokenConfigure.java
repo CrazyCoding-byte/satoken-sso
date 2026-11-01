@@ -20,7 +20,8 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/auth/login",   // 登录接口本身不能要求登录
-                        "/error"         // Spring Boot 错误转发，不排除会 401 死循环
+                        "/error",         // Spring Boot 错误转发，不排除会 401 死循环
+                        "/oauth2/**"
                 );
     }
 }

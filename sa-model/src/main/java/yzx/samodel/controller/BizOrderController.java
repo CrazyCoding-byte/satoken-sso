@@ -28,7 +28,6 @@ public class BizOrderController {
 
     /** 这个接口用来观察数据权限对 SQL 的改写效果 */
     @GetMapping("/page")
-    @SaCheckPermission()
     public Result<IPage<BizOrder>> page(@RequestParam(defaultValue = "1") long current,
                                         @RequestParam(defaultValue = "10") long size) {
         return Result.success(bizOrderService.page(new Page<>(current, size)));

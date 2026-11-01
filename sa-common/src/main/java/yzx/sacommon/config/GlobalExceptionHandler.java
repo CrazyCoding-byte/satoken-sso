@@ -3,6 +3,7 @@ package yzx.sacommon.config;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
+import cn.dev33.satoken.oauth2.exception.SaOAuth2Exception;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,9 +28,23 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.status(401).body(Result.error(null));
     }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Result<Void>> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.status(400).body(Result.error(null));
     }
 
+    /**
+     *
+     access_token 无效（30106）/
+     scope 不足（30108）
+     *
+     SaOAuth2Exception 继承
+     SaTokenException，
+     不是 NotLoginException，不单独处理会变成 500
+     */
+    @ExceptionHandler(SaOAuth2Exception.class)
+    public ResponseEntity<Result<Void>> handleOAuth2(SaOAuth2Exception e) {
+        return ResponseEntity.status(401).body(Result.error(null));
+    }
 }

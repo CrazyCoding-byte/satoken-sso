@@ -92,6 +92,7 @@ public class AuthServiceImpl implements AuthService {
         loginResponse.setUserId(sysUser.getId());
         loginResponse.setNickname(sysUser.getNickname());
         loginResponse.setTenantId(tenant.getId());
+        loginResponse.setDeptId(sysUser.getDeptId());
         loginResponse.setUserType(sysUser.getUserType());
         return loginResponse;
     }
