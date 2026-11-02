@@ -37,12 +37,11 @@ public class SaUserFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try {
-            String tokenName = SaManager.getConfig().getTokenName();
-            String tokenValue = request.getHeader(tokenName);
-            if (tokenValue != null && !tokenValue.isEmpty() && !tokenValue.isBlank()) {
-                Object loginId = StpUtil.getLoginIdByToken(tokenValue);
-                if (loginId != null) {
-                    SaSession saSession = StpUtil.getSessionByLoginId(loginId);
+            Object loginId = resolveLoginId(request);
+            if (loginId != null) {
+                // false：会话不存在时返回 null，不要凭空创建一个空会话
+                SaSession saSession = StpUtil.getSessionByLoginId(loginId, false);
+                if (saSession != null) {
                     Object json = saSession.get(SESSION_KEY);
                     if (json != null) {
                         CurrentUser currentUser = objectMapper.readValue(json.toString(), CurrentUser.class);
