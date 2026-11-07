@@ -1,0 +1,27 @@
+# 启动：uv run uvicorn main:app --reload --port 9000
+
+GET http://127.0.0.1:9000/
+Accept: application/json
+
+###
+
+# 把 <token> 换成登录接口返回的 tokenValue
+POST http://127.0.0.1:9000/chat
+Content-Type: application/json
+satoken: <token>
+
+{
+  "message": "我是谁？能看到哪些订单？"
+}
+
+###
+
+POST http://127.0.0.1:9000/chat/stream
+Content-Type: application/json
+satoken: <token>
+
+{
+  "message": "帮我看看第一页订单有哪些"
+}
+
+###
