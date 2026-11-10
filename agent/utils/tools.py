@@ -4,6 +4,7 @@ from typing import Annotated
 import httpx
 from langchain_core.tools import tool
 from pydantic import Field
+from langgraph.types import interrupt
 
 ORDERS_API = "http://localhost:8083"
 AUTH_API = "http://localhost:8081"
@@ -17,6 +18,31 @@ def bind_token(token: str | None):
 
 def reset_token(handle) -> None:
     _token.reset(handle)
+
+
+async def _delete_json(url: str) -> tuple[bool, object]:
+    headers = {"Accept": "application/json"}
+    if _token.get():
+        headers["satoken"] = _token.get()
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.delete(url, headers=headers)
+        payload = resp.json()
+    except httpx.HTTPError as exc:
+        return False, f"请求{url}失败:{exc._class_._name_}{exc}"
+    except ValueError:
+        return False, f"{url}返回的不是JSON(HTTP{resp.status_code})"
+    if isinstance(payload, dict) and "200" in payload:
+        return True, payload["200"]
+    if isinstance(payload, dict) and "500" in payload:
+        return False, payload["500"]
+    return False, f"HTTP{resp.status_code}:{payload}"
+
+
+@tool
+async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删除订单 ID")], ) -> str:
+    """删除一条订单,写操作,执行前会暂停等待用户确认"""
+    decision = interrupt({"action": "delete_order", "order_id": order_id}, )
 
 
 async def _get_json(base: str, path: str, params: dict | None = None) -> tuple[bool, object]:

@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field  # pydantic Dto+@Valid+@BotBlank 定义“
 from langchain_core.messages import HumanMessage, SystemMessage, \
     ToolMessage  # ChatOllama(model="qwen3:8b") `` 相当于注入一个远程服务的 Client Bean
 from langchain_ollama import ChatOllama  # langchain_ollama 相当于一个`RestTemplate` 的封装 LangChain 对接本地 Ollama 的适配包
+from utils.graph import graph
 from utils.tools import TOOLS, bind_token, reset_token
 
 app = FastAPI(title="sa-agent")  # app = FastAPI() `SpringApplication` 启动出来的上下文 ：所有路由都挂在它身上
@@ -25,27 +26,46 @@ async def root():
 @app.post("/chat")
 async def chat(req: ChatRequest, satoken: str | None = Header(default=None)):
     handle = bind_token(satoken)
-    used_tools: list[str] = []
     try:
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),  # 设定身份、规矩，每次请求都要带上 `` system
-            HumanMessage(content=req.message)  # 用户这句话 `` user
-        ]
-        for _ in range(5):
-            ai = await model_with_tools.ainvoke(messages)
-            messages.append(ai)
-            if not ai.tool_calls:
-                return {"replay": ai.text, "used_tools": used_tools}
-            for call in ai.tool_calls:  # 模型不再要工具,说明它准备回答了
-                used_tools.append(call["name"])
-                tool = TOOLS_BY_NAME[call["name"]]
-                try:
-                    result = await tool.ainvoke(call["args"])
-                except Exception as exc:
-                    result = f"工具执行异常:{exc}"
-                messages.append(
-                    ToolMessage(content=str(result), tool_call_id=call["id"])
-                )
-        return {"reply": "工具调用轮次过多,已停止", "used_tools": used_tools}
+        state = await graph.ainoke(
+            {"messages": [
+                SystemMessage(content=SYSTEM_PROMPT),
+                HumanMessage(content=req.message)
+            ]},
+            config={"recursion_limit": 8},
+        )
+        used = [call["name"]
+                for m in state["messages"]
+                for call in getattr(m, "tool_calls", [])
+                ]
+        return {"reply": state["message"[-1].text, "used_tools":used]}
     finally:
         reset_token(handle)
+
+# @app.post("/chat")
+# async def chat(req: ChatRequest, satoken: str | None = Header(default=None)):
+#     handle = bind_token(satoken)
+#     used_tools: list[str] = []
+#     try:
+#         messages = [
+#             SystemMessage(content=SYSTEM_PROMPT),  # 设定身份、规矩，每次请求都要带上 `` system
+#             HumanMessage(content=req.message)  # 用户这句话 `` user
+#         ]
+#         for _ in range(5):
+#             ai = await model_with_tools.ainvoke(messages)
+#             messages.append(ai)
+#             if not ai.tool_calls:
+#                 return {"replay": ai.text, "used_tools": used_tools}
+#             for call in ai.tool_calls:  # 模型不再要工具,说明它准备回答了
+#                 used_tools.append(call["name"])
+#                 tool = TOOLS_BY_NAME[call["name"]]
+#                 try:
+#                     result = await tool.ainvoke(call["args"])
+#                 except Exception as exc:
+#                     result = f"工具执行异常:{exc}"
+#                 messages.append(
+#                     ToolMessage(content=str(result), tool_call_id=call["id"])
+#                 )
+#         return {"reply": "工具调用轮次过多,已停止", "used_tools": used_tools}
+#     finally:
+#         reset_token(handle)
