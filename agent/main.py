@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, \
 from langchain_ollama import ChatOllama  # langchain_ollama 相当于一个`RestTemplate` 的封装 LangChain 对接本地 Ollama 的适配包
 from utils.graph import graph
 from utils.tools import TOOLS, bind_token, reset_token
-
+import uuid
 app = FastAPI(title="sa-agent")  # app = FastAPI() `SpringApplication` 启动出来的上下文 ：所有路由都挂在它身上
 model = ChatOllama(model="qwen3:8b", temperature=0)
 model_with_tools = model.bind_tools(TOOLS)
@@ -16,7 +16,10 @@ SYSTEM_PROMPT = "你是一个简洁的中文助手,回答控制在三句话以�
 class ChatRequest(BaseModel):  # 继承BaseModel 类
     message: str = Field(min_length=1,
                          max_length=2000)  # `Field(min_length=1)` 等价于 Java 的`@Size(min = 1, max = 2000)` ： 空字符串、超长字符串会被在校验阶段拒掉，返回 422 。
-
+    thread_id:str|None=None
+class ConfirmRequest(BaseModel):   #class BaseModel(metaclass=_model_construction.ModelMetaclass): 元类类似于反射在类创建的时候做一些操作
+    thread_id:str
+    decision:str="reject"
 
 @app.get("/")
 async def root():
@@ -26,22 +29,32 @@ async def root():
 @app.post("/chat")
 async def chat(req: ChatRequest, satoken: str | None = Header(default=None)):
     handle = bind_token(satoken)
+    thread_id=req.thread_id or str(uuid.uuid4())
+    config={"configurable":{"thread_id":thread_id},"recursion_limit":8}
     try:
         state = await graph.ainoke(
             {"messages": [
                 SystemMessage(content=SYSTEM_PROMPT),
                 HumanMessage(content=req.message)
             ]},
-            config={"recursion_limit": 8},
+            config=config,
         )
-        used = [call["name"]
-                for m in state["messages"]
-                for call in getattr(m, "tool_calls", [])
-                ]
-        return {"reply": state["message"[-1].text, "used_tools":used]}
+        pending=state.get("__interrupt")
+        if pending:
+            return{
+                "status":"pending_approval",
+                "thread_id":thread_id,
+                "question":pending[0].vlaue
+            }
+        return{
+            "status":"done",
+            "thread_id":thread_id,
+            "reply":state["messages"][-1].text,
+        }
     finally:
         reset_token(handle)
-
+@app.post("/chat/confirm")
+async def confirm(req:ConfirmRequest,satoken:str|None=Header(default=None))
 # @app.post("/chat")
 # async def chat(req: ChatRequest, satoken: str | None = Header(default=None)):
 #     handle = bind_token(satoken)

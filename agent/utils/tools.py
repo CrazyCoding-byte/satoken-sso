@@ -29,7 +29,7 @@ async def _delete_json(url: str) -> tuple[bool, object]:
             resp = await client.delete(url, headers=headers)
         payload = resp.json()
     except httpx.HTTPError as exc:
-        return False, f"请求{url}失败:{exc._class_._name_}{exc}"
+        return False, f"请求{url}失败:{exc.__class__.__name__}{exc}"
     except ValueError:
         return False, f"{url}返回的不是JSON(HTTP{resp.status_code})"
     if isinstance(payload, dict) and "200" in payload:
@@ -43,6 +43,12 @@ async def _delete_json(url: str) -> tuple[bool, object]:
 async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删除订单 ID")], ) -> str:
     """删除一条订单,写操作,执行前会暂停等待用户确认"""
     decision = interrupt({"action": "delete_order", "order_id": order_id}, )
+    if decision != "approve":
+        return "用户拒绝了删除操作,订单没有变化"
+    ok, data = await _delete_json(f"{ORDERS_API}/order/{order_id}")
+    if not ok:
+        return f"删除失败:{data}"
+    return f"订单{order_id}已删除"
 
 
 async def _get_json(base: str, path: str, params: dict | None = None) -> tuple[bool, object]:
@@ -84,4 +90,4 @@ async def current_user() -> str:
     return json.dump(data, ensure_ascii=False, default=str)
 
 
-TOOLS = [query_orders, current_user]
+TOOLS = [query_orders, current_user, delete_order]
