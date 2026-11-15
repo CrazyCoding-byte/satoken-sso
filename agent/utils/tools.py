@@ -43,11 +43,13 @@ async def _delete_json(url: str) -> tuple[bool, object]:
 async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删除订单 ID")], ) -> str:
     """删除一条订单,写操作,执行前会暂停等待用户确认"""
     decision = interrupt({"action": "delete_order", "order_id": order_id}, )
-    if decision != "approve":
+    if str(decision).strip().lower() != "approve":
         return "用户拒绝了删除操作,订单没有变化"
     ok, data = await _delete_json(f"{ORDERS_API}/order/{order_id}")
     if not ok:
         return f"删除失败:{data}"
+    if data is not True:
+        return f"订单{order_id}不存在或已被删除,数据库没有变化"
     return f"订单{order_id}已删除"
 
 
@@ -87,7 +89,7 @@ async def current_user() -> str:
     ok, data = await _get_json(AUTH_API, "/auth/info")
     if not ok:
         return f"查询失败:{data}"
-    return json.dump(data, ensure_ascii=False, default=str)
+    return json.dumps(data, ensure_ascii=False, default=str)
 
 
 TOOLS = [query_orders, current_user, delete_order]
