@@ -4,7 +4,11 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode, tools_condition
 from utils.tools import TOOLS
 
-model = ChatOllama(model="qwen3:8b", temperature=0)
+model = ChatOllama(model="qwen3:8b",
+                   temperature=0,
+                   keep_alive="30m",  # 30 分钟内不卸载模型，避免冷启动撞上请求
+                   num_ctx=8192,  # 默认 4096 太小，订单 JSON 一长就截断
+                   )
 model_with_tools = model.bind_tools(TOOLS)
 
 

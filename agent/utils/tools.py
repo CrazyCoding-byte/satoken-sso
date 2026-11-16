@@ -49,7 +49,7 @@ async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删�
     if not ok:
         return f"删除失败:{data}"
     if data is not True:
-        return f"订单{order_id}不存在或已被删除,数据库没有变化"
+        return f"删除未执行：订单 {order_id} 此前已被删除，数据库状态没有变化。"
     return f"订单{order_id}已删除"
 
 
