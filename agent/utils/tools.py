@@ -5,6 +5,7 @@ import httpx
 from langchain_core.tools import tool
 from pydantic import Field
 from langgraph.types import interrupt
+from langgraph.config import get_store
 
 ORDERS_API = "http://localhost:8083"
 AUTH_API = "http://localhost:8081"
@@ -92,4 +93,20 @@ async def current_user() -> str:
     return json.dumps(data, ensure_ascii=False, default=str)
 
 
-TOOLS = [query_orders, current_user, delete_order]
+@tool
+async def save_memory(key: str, value: str) -> str:
+    """记住一条关于用户的长期事实。key 用简短英文，例如 name、city、favorite_color"""
+    await get_store().aput(("memories",), key, {"text": value})
+    return f"已记住 {key} = {value}"
+
+
+@tool
+async def recall_memory() -> str:
+    """取回所有关于该用户的长期记忆"""
+    items = await get_store().asearch(("memories",))
+    if not items:
+        return "还没有任何长期记忆"
+    return "；".join(f"{i.key}={i.value['text']}" for i in items)
+
+
+TOOLS = [query_orders, current_user, delete_order, save_memory, recall_memory]

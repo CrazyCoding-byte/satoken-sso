@@ -1,11 +1,14 @@
 from langgraph.graph import END, MessagesState, StateGraph
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 import aiosqlite
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.store.sqlite.aio import AsyncSqliteStore
 from langgraph.prebuilt import ToolNode, tools_condition
 from utils.tools import TOOLS
 
 graph = None
+store = None
 model = ChatOllama(model="qwen3:8b",
                    temperature=0,
                    keep_alive="30m",  # 30 分钟内不卸载模型，避免冷启动撞上请求
@@ -13,9 +16,32 @@ model = ChatOllama(model="qwen3:8b",
                    )
 model_with_tools = model.bind_tools(TOOLS)
 
+MAX_HISTORY = 8  # 只把最近 8 条消息喂给模型,state 里仍然存全量
+
+
+def trim_messages(messages: list) -> list:
+    """保留开头的 system,再加最近 MAX_HISTORY 条;从第一条 HumanMessage 开始,避免切断 tool_calls 和 ToolMessage 的配对"""
+    if len(messages) <= MAX_HISTORY:
+        return messages
+    system = [m for m in messages if isinstance(m, SystemMessage)][:1]
+    tail = messages[-MAX_HISTORY:]
+    start = 0
+    while start < len(tail) and not isinstance(tail[start], HumanMessage):
+        start += 1
+    if start == len(tail):
+        return messages
+    return system + tail[start:]
+
 
 async def agent_node(state: MessagesState):
-    ai = await model_with_tools.ainvoke(state["messages"])
+    msgs = trim_messages(state["messages"])
+    items = await store.asearch(("memories",))
+    if items:
+        facts = ": ".join(f"{i.key}" for i in items)
+        system = [m for m in msgs if isinstance(m, SystemMessage)]
+        others = [m for m in msgs if not isinstance(m, SystemMessage)]
+        msgs = system + [SystemMessage(content=f"关于这个用户的已知信息:{facts}")] + others
+    ai = await model_with_tools(msgs)
     return {"messages": [ai]}
 
 
@@ -28,6 +54,9 @@ builder.add_edge("tools", "agent")  # 工具跑完->再问模型
 
 
 async def init_graph() -> None:
-    global graph
+    global graph, store
     conn = await aiosqlite.connect("checkpoints.db")
-    graph = builder.compile(checkpointer=AsyncSqliteSaver(conn))
+    store_conn = await aiosqlite.connect("store.db")
+    store = AsyncSqliteStore(store_conn)  #
+    await store.setup()  # 等价于建表，不调用第一次`aput` 会报表不存在。
+    graph = builder.compile(checkpointer=AsyncSqliteSaver(conn), store=store)

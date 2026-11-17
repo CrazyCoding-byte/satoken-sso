@@ -40,7 +40,7 @@ def make_config(thread_id: str) -> dict:
 
 async def build_input(thread_id: str, message: str) -> dict:
     """新线程才带 system；老线程只追加用户这句"""
-    state = await graph_module.graph.agent_state(make_config(thread_id))
+    state = await graph_module.graph.aget_state(make_config(thread_id))
     history = (state.values or {}).get("messages", [])
     messages = [HumanMessage(content=message)]
     if not history:
@@ -59,7 +59,7 @@ async def chat(req: ChatRequest, satoken: str | None = Header(default=None)):
     thread_id = req.thread_id or str(uuid.uuid4())
     try:
         payload = await build_input(thread_id, req.message)
-        out = await graph_module.graph.ainoke(payload, config=make_config(thread_id), version="v2")
+        out = await graph_module.graph.ainvoke(payload, config=make_config(thread_id), version="v2")
         if out.interrupts:
             return {
                 "status": "pending_approval",
