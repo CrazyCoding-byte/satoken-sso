@@ -1,9 +1,11 @@
 from langgraph.graph import END, MessagesState, StateGraph
 from langchain_ollama import ChatOllama
-from langgraph.checkpoint.memory import MemorySaver
+import aiosqlite
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.prebuilt import ToolNode, tools_condition
 from utils.tools import TOOLS
 
+graph = None
 model = ChatOllama(model="qwen3:8b",
                    temperature=0,
                    keep_alive="30m",  # 30 分钟内不卸载模型，避免冷启动撞上请求
@@ -23,4 +25,9 @@ builder.add_node("tools", ToolNode(TOOLS))  # 节点2:执行工具
 builder.set_entry_point("agent")  # 从哪开始
 builder.add_conditional_edges("agent", tools_condition)  # 模型要工具->tools,不要->结束
 builder.add_edge("tools", "agent")  # 工具跑完->再问模型
-graph = builder.compile(checkpointer=MemorySaver())
+
+
+async def init_graph() -> None:
+    global graph
+    conn = await aiosqlite.connect("checkpoints.db")
+    graph = builder.compile(checkpointer=AsyncSqliteSaver(conn))
