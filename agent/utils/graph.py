@@ -37,11 +37,11 @@ async def agent_node(state: MessagesState):
     msgs = trim_messages(state["messages"])
     items = await store.asearch(("memories",))
     if items:
-        facts = ": ".join(f"{i.key}" for i in items)
+        facts = ": ".join(f"{i.key}={i.value['text']}" for i in items)
         system = [m for m in msgs if isinstance(m, SystemMessage)]
         others = [m for m in msgs if not isinstance(m, SystemMessage)]
         msgs = system + [SystemMessage(content=f"关于这个用户的已知信息:{facts}")] + others
-    ai = await model_with_tools(msgs)
+    ai = await model_with_tools.ainvoke(msgs)
     return {"messages": [ai]}
 
 
@@ -56,7 +56,7 @@ builder.add_edge("tools", "agent")  # 工具跑完->再问模型
 async def init_graph() -> None:
     global graph, store
     conn = await aiosqlite.connect("checkpoints.db")
-    store_conn = await aiosqlite.connect("store.db")
+    store_conn = await aiosqlite.connect("store.db", isolation_level=None)
     store = AsyncSqliteStore(store_conn)  #
     await store.setup()  # 等价于建表，不调用第一次`aput` 会报表不存在。
     graph = builder.compile(checkpointer=AsyncSqliteSaver(conn), store=store)

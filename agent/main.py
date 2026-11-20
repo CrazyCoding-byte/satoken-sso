@@ -4,7 +4,7 @@ from fastapi import FastAPI, Header
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import Command
 from pydantic import BaseModel, Field
-
+from utils.rag import build_index
 import utils.graph as graph_module  # import 直接引入整个模块 from引入特定的类
 from utils.tools import bind_token, reset_token
 
@@ -12,6 +12,7 @@ from utils.tools import bind_token, reset_token
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await graph_module.init_graph()
+    print("知识库片段数:", build_index())
     yield
 
 

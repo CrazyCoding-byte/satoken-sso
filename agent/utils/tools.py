@@ -6,6 +6,7 @@ from langchain_core.tools import tool
 from pydantic import Field
 from langgraph.types import interrupt
 from langgraph.config import get_store
+from utils.rag import search as rag_search
 
 ORDERS_API = "http://localhost:8083"
 AUTH_API = "http://localhost:8081"
@@ -41,6 +42,12 @@ async def _delete_json(url: str) -> tuple[bool, object]:
 
 
 @tool
+async def query_knowledge(question: str) -> str:
+    """查询订单系统的业务规则、权限说明和数据规范。回答制度类问题前要调用这个工具"""
+    return await rag_search(question)
+
+
+@tool
 async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删除订单 ID")], ) -> str:
     """删除一条订单,写操作,执行前会暂停等待用户确认"""
     decision = interrupt({"action": "delete_order", "order_id": order_id}, )
@@ -52,25 +59,6 @@ async def delete_order(order_id: Annotated[int, Field(ge=1, description="要删�
     if data is not True:
         return f"删除未执行：订单 {order_id} 此前已被删除，数据库状态没有变化。"
     return f"订单{order_id}已删除"
-
-
-async def _get_json(base: str, path: str, params: dict | None = None) -> tuple[bool, object]:
-    headers = {"Accept": "application/json"}
-    if _token.get():
-        headers["satoken"] = _token.get()
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(base + path, params=params, headers=headers)
-        payload = resp.json()
-    except httpx.HTTPError as exc:
-        return False, f"请求 {base}{path} 失败：{exc.__class__.__name__} {exc}"
-    except ValueError:
-        return False, f"{base}{path}返回的不是JSON(HTTP{resp.status_code})"
-    if isinstance(payload, dict) and "200" in payload:
-        return True, payload["200"]  # 你后端Result的信封
-    if isinstance(payload, dict) and "500" in payload:
-        return False, payload["500"]
-    return False, f"Http{resp.status_code}:{payload}"
 
 
 @tool
@@ -109,4 +97,23 @@ async def recall_memory() -> str:
     return "；".join(f"{i.key}={i.value['text']}" for i in items)
 
 
-TOOLS = [query_orders, current_user, delete_order, save_memory, recall_memory]
+async def _get_json(base: str, path: str, params: dict | None = None) -> tuple[bool, object]:
+    headers = {"Accept": "application/json"}
+    if _token.get():
+        headers["satoken"] = _token.get()
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(base + path, params=params, headers=headers)
+        payload = resp.json()
+    except httpx.HTTPError as exc:
+        return False, f"请求 {base}{path} 失败：{exc.__class__.__name__} {exc}"
+    except ValueError:
+        return False, f"{base}{path}返回的不是JSON(HTTP{resp.status_code})"
+    if isinstance(payload, dict) and "200" in payload:
+        return True, payload["200"]  # 你后端Result的信封
+    if isinstance(payload, dict) and "500" in payload:
+        return False, payload["500"]
+    return False, f"Http{resp.status_code}:{payload}"
+
+
+TOOLS = [query_orders, current_user, delete_order, save_memory, recall_memory,query_knowledge]
