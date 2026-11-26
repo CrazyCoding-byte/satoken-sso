@@ -8,4 +8,6 @@ public class LoginRequest {
     private String tenantCode;
     private String username;
     private String password;
+
+
 }

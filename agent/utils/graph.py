@@ -1,5 +1,5 @@
 from langgraph.graph import END, MessagesState, StateGraph
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, trim_messages
 from langchain_ollama import ChatOllama
 import aiosqlite
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -16,27 +16,65 @@ model = ChatOllama(model="qwen3:8b",
                    )
 model_with_tools = model.bind_tools(TOOLS)
 
-MAX_HISTORY = 8  # 只把最近 8 条消息喂给模型,state 里仍然存全量
+MAX_CONTEXT_TOKENS = 3000  # 只把最近 8 条消息喂给模型,state 里仍然存全量
 
 
-def trim_messages(messages: list) -> list:
-    """保留开头的 system,再加最近 MAX_HISTORY 条;从第一条 HumanMessage 开始,避免切断 tool_calls 和 ToolMessage 的配对"""
-    # 文件len没超过8就返回
-    if len(messages) <= MAX_HISTORY:
-        return messages
-    #	只留第一条 system，后续单独拼回去
-    system = [m for m in messages if isinstance(m, SystemMessage)][:1]
-    tail = messages[-MAX_HISTORY:]
-    start = 0
-    while start < len(tail) and not isinstance(tail[start], HumanMessage):
-        start += 1
-    if start == len(tail):
-        return messages
-    return system + tail[start:]
+# def trim_messages(messages: list) -> list:
+#     """保留开头的 system,再加最近 MAX_HISTORY 条;从第一条 HumanMessage 开始,避免切断 tool_calls 和 ToolMessage 的配对"""
+#     # 文件len没超过8就返回
+#     if len(messages) <= MAX_HISTORY:
+#         return messages
+#     #	只留第一条 system，后续单独拼回去 if isinstance 类似于java的
+#     system = [m for m in messages if isinstance(m, SystemMessage)][:1]
+#     tail = messages[-MAX_HISTORY:]  # 最后 8 条（负索引 = Java 的 subList(size-8, size)）
+#     start = 0
+#     """
+#         while (start < tail.size() && !(tail.get(start) instanceof HumanMessage)) {
+#             start++;
+#         }
+#     """
+#     while start < len(tail) and not isinstance(tail[start], HumanMessage):  # 丢掉尾部开头的零碎 AI/Tool 消息
+#         start += 1
+#     if start == len(tail):
+#         return messages
+#     return system + tail[start:]
+
+def build_context(messages: list) -> list:
+    return trim_messages(
+        messages,
+        max_token=MAX_CONTEXT_TOKENS,
+        token_counter="approximate",
+        strategy="last",
+        allow_partial=False,
+        start_on="human",
+        include_system=True
+    )
 
 
+"""
+这里这个messages对象是一个dict 存储的当前和ai的聊天信息
+state = {
+    "messages": [
+        SystemMessage(content="你是订单系统的助手。需要订单或用户数据时必须调用工具查询……"),
+        HumanMessage(content="我叫张三，请记住"),
+        AIMessage(content="好的，我记住了您的名字是张三。"),
+        HumanMessage(content="我叫什么名字？"),
+        AIMessage(content="", tool_calls=[{"name": "current_user", "args": {}, "id": "call_abc"}]),
+        ToolMessage(content="查询失败:ConnectError ...", tool_call_id="call_abc"),
+        AIMessage(content="您的名字是张三。当前系统无法获取登录信息。"),
+    ]
+}  类似于这样
+"""
+
+"""
+   ┌───────── set_entry_point ─────────┐
+        ↓                                   │
+      agent ──tools_condition──> tools ─────┘ (add_edge)
+        │
+        └──tools_condition──> END
+"""
 async def agent_node(state: MessagesState):
-    msgs = trim_messages(state["messages"])
+    msgs = build_context(state["messages"])
     items = await store.asearch(("memories",))
     if items:
         facts = ": ".join(f"{i.key}={i.value['text']}" for i in items)
