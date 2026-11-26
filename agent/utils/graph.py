@@ -21,8 +21,10 @@ MAX_HISTORY = 8  # 只把最近 8 条消息喂给模型,state 里仍然存全量
 
 def trim_messages(messages: list) -> list:
     """保留开头的 system,再加最近 MAX_HISTORY 条;从第一条 HumanMessage 开始,避免切断 tool_calls 和 ToolMessage 的配对"""
+    # 文件len没超过8就返回
     if len(messages) <= MAX_HISTORY:
         return messages
+    #	只留第一条 system，后续单独拼回去
     system = [m for m in messages if isinstance(m, SystemMessage)][:1]
     tail = messages[-MAX_HISTORY:]
     start = 0
