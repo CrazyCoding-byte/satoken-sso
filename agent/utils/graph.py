@@ -42,7 +42,7 @@ MAX_CONTEXT_TOKENS = 3000  # 只把最近 8 条消息喂给模型,state 里仍�
 def build_context(messages: list) -> list:
     return trim_messages(
         messages,
-        max_token=MAX_CONTEXT_TOKENS,
+        max_tokens=MAX_CONTEXT_TOKENS,
         token_counter="approximate",
         strategy="last",
         allow_partial=False,
